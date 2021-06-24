@@ -4,11 +4,15 @@ use std::fmt;
 use serde::{Serialize, Deserialize};
 use bson::{DateTime, oid::ObjectId};
 
+use crate::context::LoginSession;
+
 #[derive(Debug, Clone)]
 pub enum ServiceError {
 	EmailNotFound,
 	IncorrectPassword,
-	EmailAlreadyExists
+	EmailAlreadyExists,
+	LoginMethodNotSupported,
+	RedirectToSignup{ sid: String, nickname: Option<String> }
 }
 impl std::error::Error for ServiceError {}
 
@@ -22,15 +26,17 @@ impl fmt::Display for ServiceError {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Voter {
 	pub email: String,
-	pub password_hashed: String,
-	pub password_salt: Vec<u8>,
+	/// Not required if THBWiki login is used
+	pub password_hashed: Option<String>,
+	pub email_verified: bool,
 	/// 新版投票用户创建日期
 	pub created_at: DateTime,
 	/// 旧版创建日期
 	pub legacy_created_at: Option<DateTime>,
 	pub nickname: Option<String>,
 	pub signup_ip: Option<String>,
-	pub qq_openid: Option<String>
+	pub qq_openid: Option<String>,
+	pub thbwiki_uid: Option<String>
 }
 
 /// 投票的JWT

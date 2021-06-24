@@ -4,9 +4,23 @@ use mongodb::{Collection, Database};
 use crate::models::Voter;
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppContext {
     //pub key_pair: ES256kKeyPair
     pub db: Database,
     pub voters_coll: Collection<Voter>
+}
+
+#[derive(Clone, Debug)]
+pub struct LoginSession {
+    pub thbwiki_uid: Option<String>
+}
+
+impl AppContext {
+    pub fn create_login_session(&self, sess: LoginSession) -> String {
+        todo!()
+    }
+    pub async fn get_login_session(&self, sid: &str) -> Option<LoginSession> {
+        todo!()
+    }
 }
