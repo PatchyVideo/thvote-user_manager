@@ -6,22 +6,24 @@ use chrono::prelude::*;
 use rand::{Rng, rngs::OsRng, RngCore};
 
 pub async fn redirect_callback(ctx: &AppContext, uid: String, email: Option<String>, nickname: Option<String>, signup_ip: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
-    if email.is_none() {
-        // Email not verified by THBWiki
-        let sess = LoginSession {
-            thbwiki_uid: Some(uid)
-        };
-        let sid = ctx.create_login_session(sess);
-        return Err(Box::new(ServiceError::RedirectToSignup{ sid: sid, nickname: nickname }))
-    }
-    let email = email.unwrap();
+	if email.is_none() {
+		// Email not verified by THBWiki
+		let sess = LoginSession {
+			thbwiki_uid: Some(uid),
+			qq_openid: None,
+			signup_ip: signup_ip
+		};
+		let sid = ctx.create_login_session(sess);
+		return Err(Box::new(ServiceError::RedirectToSignup{ sid: sid, nickname: nickname }))
+	}
+	let email = email.unwrap();
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
-        let mut voter = voter.clone();
-        voter.thbwiki_uid = Some(uid);
-        ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
-        Ok(voter)
+		let mut voter = voter.clone();
+		voter.thbwiki_uid = Some(uid);
+		ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
+		Ok(voter)
 	} else {
-        let voter = Voter {
+		let voter = Voter {
 			email: email,
 			email_verified: false,
 			password_hashed: None,

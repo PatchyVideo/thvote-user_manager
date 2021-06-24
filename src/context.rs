@@ -13,7 +13,9 @@ pub struct AppContext {
 
 #[derive(Clone, Debug)]
 pub struct LoginSession {
-    pub thbwiki_uid: Option<String>
+    pub thbwiki_uid: Option<String>,
+    pub qq_openid: Option<String>,
+    pub signup_ip: Option<String>
 }
 
 impl AppContext {

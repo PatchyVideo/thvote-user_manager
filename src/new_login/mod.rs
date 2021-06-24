@@ -30,7 +30,9 @@ pub async fn signup(ctx: &AppContext, email: String, password: String, nickname:
 				if let Some(thbwiki_uid) = sess.thbwiki_uid {
 					voter.thbwiki_uid = Some(thbwiki_uid);
 				}
-				// TODO: QQ
+				if let Some(qq_openid) = sess.qq_openid {
+					voter.qq_openid = Some(qq_openid);
+				}
 			}
 		}
 		ctx.voters_coll.insert_one(voter.clone(), None).await?;
@@ -50,7 +52,9 @@ pub async fn login(ctx: &AppContext, email: String, password: String, sid: Optio
 						if let Some(thbwiki_uid) = sess.thbwiki_uid {
 							voter.thbwiki_uid = Some(thbwiki_uid);
 						}
-						// TODO: QQ
+						if let Some(qq_openid) = sess.qq_openid {
+							voter.qq_openid = Some(qq_openid);
+						}
 						ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
 					}
 				}
