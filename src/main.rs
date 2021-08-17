@@ -18,11 +18,6 @@ use mongodb::{Client, options::ClientOptions};
 
 use redis::AsyncCommands;
 
-async fn greet(ctx: web::Data<context::AppContext>, req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap_or("World");
-    format!("{} {}!", "hello", &name)
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 
@@ -42,13 +37,11 @@ async fn main() -> std::io::Result<()> {
     };
     HttpServer::new(move || {
         App::new().data(ctx.clone())
-            .route("/", web::get().to(greet))
-            .route("/{name}", web::get().to(greet))
-            .route("/login-email-password", web::post().to(handlers::login_email_password))
-            .route("/login-email", web::post().to(handlers::login_email))
-            .route("/login-phone", web::post().to(handlers::login_phone))
-            .route("/send-sms-code", web::post().to(handlers::send_phone_verify_code))
-            .route("/send-email-code", web::post().to(handlers::send_email_verify_code))
+            .route("/v1/login-email-password", web::post().to(handlers::login_email_password))
+            .route("/v1/login-email", web::post().to(handlers::login_email))
+            .route("/v1/login-phone", web::post().to(handlers::login_phone))
+            .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
+            .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
