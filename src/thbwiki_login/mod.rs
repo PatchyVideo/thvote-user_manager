@@ -23,18 +23,22 @@ pub async fn redirect_callback(ctx: &AppContext, uid: String, email: Option<Stri
 		ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
 		Ok(voter)
 	} else {
-		let voter = Voter {
-			email: email,
-			email_verified: false,
+		let mut voter = Voter {
+			_id: None,
+			email: Some(email),
+			email_verified: true,
 			password_hashed: None,
 			created_at: bson::DateTime(Utc::now()),
 			legacy_created_at: None,
 			nickname: nickname,
 			signup_ip: signup_ip,
 			qq_openid: None,
-			thbwiki_uid: Some(uid)
+			thbwiki_uid: Some(uid),
+			phone: None,
+			phone_verified: false,
 		};
-		ctx.voters_coll.insert_one(voter.clone(), None).await?;
+		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
+		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
 		Ok(voter)
 	}
 }
