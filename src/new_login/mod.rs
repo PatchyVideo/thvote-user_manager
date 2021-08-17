@@ -66,7 +66,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			password_hashed: None,
 			created_at: bson::DateTime(Utc::now()),
 			legacy_created_at: None,
-			nickname: None,
+			nickname: nickname,
 			signup_ip: ip,
 			qq_openid: None,
 			thbwiki_uid: None
