@@ -43,7 +43,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", 80))?
     .run()
     .await
 }
