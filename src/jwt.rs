@@ -13,6 +13,6 @@ fn read_a_file(filename: &str) -> std::io::Result<Vec<u8>> {
 }
 
 pub async fn load_keys() -> Result<ES256kKeyPair, Box<dyn std::error::Error>> {
-	Ok(ES256kKeyPair::from_pem(std::str::from_utf8(&read_a_file("testkey1-priv.pem")?)?)?)
+	Ok(ES256kKeyPair::from_pem(std::str::from_utf8(&read_a_file("../keys/key-priv.pem")?)?)?)
 }
 
