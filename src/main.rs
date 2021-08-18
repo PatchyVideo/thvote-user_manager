@@ -21,7 +21,7 @@ use redis::AsyncCommands;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 
-    let client_options = ClientOptions::parse("mongodb://127.0.0.1:27017").await.expect("Failed to parse MongoDB parameters");
+    let client_options = ClientOptions::parse("mongodb://mongo:27017").await.expect("Failed to parse MongoDB parameters");
 	let client = Client::with_options(client_options).expect("Failed to connect to MongoDB");
 
 	let db = client.database("thvote_users");
@@ -43,7 +43,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
     })
-    .bind(("127.0.0.1", 80))?
+    .bind(("0.0.0.0", 80))?
     .run()
     .await
 }
