@@ -2719,6 +2719,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "thvote-user_manager"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "bson",
+ "chrono",
+ "jwt-simple",
+ "mongodb",
+ "rand 0.8.4",
+ "redis",
+ "rust-argon2",
+ "serde",
+]
+
+[[package]]
 name = "time"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3007,21 +3022,6 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
-]
-
-[[package]]
-name = "user_manager"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "bson",
- "chrono",
- "jwt-simple",
- "mongodb",
- "rand 0.8.4",
- "redis",
- "rust-argon2",
- "serde",
 ]
 
 [[package]]
