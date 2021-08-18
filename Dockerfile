@@ -5,5 +5,7 @@ FROM scratch
 COPY target/x86_64-unknown-linux-musl/release/user_manager /webapp/app
 WORKDIR /webapp
 
+EXPOSE 80
+
 # This command runs your application, comment out this line to compile only
 CMD ["./app"]
