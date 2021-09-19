@@ -1610,6 +1610,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5a279bb9607f9f53c22d496eade00d138d1bdcccd07d74650387cf94942a15"
+dependencies = [
+ "block-buffer 0.9.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "memchr"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1713,7 +1724,7 @@ dependencies = [
  "hex",
  "hmac 0.7.1",
  "lazy_static",
- "md-5",
+ "md-5 0.8.0",
  "os_info",
  "pbkdf2",
  "percent-encoding",
@@ -2723,14 +2734,18 @@ name = "thvote-user_manager"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "base64 0.13.0",
  "bson",
  "chrono",
+ "hex",
  "jwt-simple",
+ "md-5 0.9.1",
  "mongodb",
  "rand 0.8.4",
  "redis",
  "rust-argon2",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

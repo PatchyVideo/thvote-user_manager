@@ -195,12 +195,21 @@ pub async fn send_sms(ctx: &AppContext, phone: String) -> Result<(), Box<dyn std
 	let code_u32 = OsRng.gen_range(RangeInclusive::new(0u32,  999999u32));
 	let code = format!("{:06}", code_u32);
 	// store in redis, expires in 1 hour
-	redis_conn.set_ex(id, code, 3600).await?;
+	redis_conn.set_ex(id, code.clone(), 3600).await?;
 	// store guard in redis, expires in 1 minutes
 	redis_conn.set_ex(id_guard, "guard", 60).await?;
 	// invoke SMS send service
-	todo!();
-	Ok(())
+	let req = crate::sms_service::SMSRequest {
+		code: code,
+		mobile: phone
+	};
+	let client = actix_web::client::Client::new();
+	let resp = client.post(format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS)).send_json(&req).await?;
+	if resp.status().is_success() {
+		Ok(())
+	} else {
+		Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
+	}
 }
 
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {

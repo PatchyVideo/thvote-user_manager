@@ -5,6 +5,9 @@ pub mod jwt;
 pub mod comm;
 pub mod handlers;
 
+pub mod sms_service;
+pub mod email_service;
+
 pub mod legacy_login;
 pub mod new_login;
 pub mod thbwiki_login;

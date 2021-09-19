@@ -28,7 +28,8 @@ pub enum ServiceError {
 	UserNotVerified,
 	LoginMethodNotSupported,
 	TooFrequent,
-	RedirectToSignup{ sid: String, nickname: Option<String> }
+	RedirectToSignup{ sid: String, nickname: Option<String> },
+	UpstreamRequestFailed { url: String }
 }
 impl std::error::Error for ServiceError {}
 
@@ -50,6 +51,7 @@ impl ServiceError {
 			ServiceError::LoginMethodNotSupported => "LoginMethodNotSupported".to_string(),
 			ServiceError::TooFrequent => "TooFrequent".to_string(),
 			ServiceError::RedirectToSignup { sid, nickname } => "RedirectToSignup".to_string(),
+    		ServiceError::UpstreamRequestFailed { url } => "UpstreamRequestFailed".to_string(),
 		}
 	}
 }
@@ -65,6 +67,7 @@ impl ResponseError for ServiceError {
 			ServiceError::LoginMethodNotSupported => StatusCode::NOT_IMPLEMENTED,
 			ServiceError::TooFrequent => StatusCode::TOO_MANY_REQUESTS,
 			ServiceError::RedirectToSignup { sid, nickname } => StatusCode::UNAUTHORIZED,
+    		ServiceError::UpstreamRequestFailed { url } => StatusCode::REQUEST_TIMEOUT,
 		}
 	}
 
