@@ -108,6 +108,8 @@ pub struct Voter {
 	pub email_verified: bool,
 	/// Not required if THBWiki login or SMS login is used
 	pub password_hashed: Option<String>,
+	/// Used only in legacy login
+	pub salt: Option<String>,
 	/// 新版投票用户创建日期
 	pub created_at: DateTime,
 	/// 旧版创建日期

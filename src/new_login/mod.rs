@@ -64,6 +64,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			phone: None,
 			phone_verified: false,
 			password_hashed: None,
+			salt: None,
 			created_at: bson::DateTime(Utc::now()),
 			legacy_created_at: None,
 			nickname: nickname,
@@ -129,11 +130,12 @@ pub async fn send_email(ctx: &AppContext, email: String) -> Result<(), Box<dyn s
 	let code_u32 = OsRng.gen_range(RangeInclusive::new(0u32,  999999u32));
 	let code = format!("{:06}", code_u32);
 	// store in redis, expires in 1 hour
-	redis_conn.set_ex(id, code, 3600).await?;
+	redis_conn.set_ex(id, code.clone(), 3600).await?;
 	// store guard in redis, expires in 1 minutes
 	redis_conn.set_ex(id_guard, "guard", 60).await?;
 	// invoke SMS send service
-	todo!();
+	//todo!();
+	println!(" -- [Email] Code = {}", code);
 	Ok(())
 }
 
@@ -155,6 +157,7 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 			phone: Some(phone),
 			phone_verified: true,
 			password_hashed: None,
+			salt: None,
 			created_at: bson::DateTime(Utc::now()),
 			legacy_created_at: None,
 			nickname: nickname,
@@ -184,7 +187,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String) -> Result<(), Box<dyn std
 	let id = format!("phone-verify-{}", phone);
 	let id_guard = format!("phone-verify-guard-{}", phone);
 	let mut redis_conn = ctx.redis_client.get_async_connection().await?;
-	// check if 1 minutes has passed since last SMS to the same phone is sent
+	// check if 1 minute has passed since last SMS to the same phone is sent
 	let guard: Option<String> = redis_conn.get(id_guard.clone()).await?;
 	if let Some(guard) = guard {
 		if guard == "guard" {
@@ -199,17 +202,19 @@ pub async fn send_sms(ctx: &AppContext, phone: String) -> Result<(), Box<dyn std
 	// store guard in redis, expires in 1 minutes
 	redis_conn.set_ex(id_guard, "guard", 60).await?;
 	// invoke SMS send service
-	let req = crate::sms_service::SMSRequest {
-		code: code,
-		mobile: phone
-	};
-	let client = actix_web::client::Client::new();
-	let resp = client.post(format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS)).send_json(&req).await?;
-	if resp.status().is_success() {
-		Ok(())
-	} else {
-		Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
-	}
+	println!(" -- [SMS] Code = {}", code);
+	// let req = crate::sms_service::SMSRequest {
+	// 	code: code,
+	// 	mobile: phone
+	// };
+	// let client = actix_web::client::Client::new();
+	// let resp = client.post(format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS)).send_json(&req).await?;
+	// if resp.status().is_success() {
+	// 	Ok(())
+	// } else {
+	// 	Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
+	// }
+	Ok(())
 }
 
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {

@@ -18,6 +18,7 @@ base64 = "0.13.0"
 md-5 = "0.9.1"
 hex = "0.4.3"
 serde_json = "1.0"
+bcrypt = "0.10"
 
 [dependencies.mongodb]
 version = "1.2.0"
