@@ -62,7 +62,7 @@ pub async fn login_phone(ctx: web::Data<AppContext>, request: HttpRequest, body:
 }
 
 pub async fn send_phone_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendPhoneVerifyCodeRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let result = new_login::send_sms(&ctx, body.phone.clone()).await;
+	let result = new_login::send_sms(&ctx, body.phone.clone(), Some(body.meta.user_ip.clone()), body.meta.additional_fingureprint.clone()).await;
 	match result {
 		Ok(r) => {
 			return Ok(web::Json(models::EmptyJSON::new()));
@@ -78,7 +78,7 @@ pub async fn send_phone_verify_code(ctx: web::Data<AppContext>, body: actix_web:
 }
 
 pub async fn send_email_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendEmailVerifyCodeRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let result = new_login::send_email(&ctx, body.email.clone()).await;
+	let result = new_login::send_email(&ctx, body.email.clone(), Some(body.meta.user_ip.clone()), body.meta.additional_fingureprint.clone()).await;
 	match result {
 		Ok(r) => {
 			return Ok(web::Json(models::EmptyJSON::new()));

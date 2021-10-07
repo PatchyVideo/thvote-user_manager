@@ -1,5 +1,11 @@
 
 #[cfg(debug_assertions)]
+pub const MONGO_ADDRESS: &'static str = "mongodb://192.168.0.54:27017";
+
+#[cfg(not(debug_assertions))]
+pub const MONGO_ADDRESS: &'static str = "mongodb://mongo:27017";
+
+#[cfg(debug_assertions)]
 pub const REDIS_ADDRESS: &'static str = "redis://192.168.0.54:6379";
 
 #[cfg(not(debug_assertions))]

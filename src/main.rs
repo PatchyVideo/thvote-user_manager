@@ -16,15 +16,22 @@ pub mod qq_binding;
 use std::{cell::Cell, sync::Arc};
 
 use actix_web::{web, App, HttpRequest, HttpServer, Responder};
+use context::AppContext;
 use jwt::load_keys;
+use models::ActivityLogEntry;
 use mongodb::{Client, options::ClientOptions};
 
 use redis::AsyncCommands;
 
+pub async fn log(ctx: &AppContext, log: ActivityLogEntry) {
+    ctx.logs_coll.insert_one(log, None).await;
+}
+
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 
-    let client_options = ClientOptions::parse("mongodb://mongo:27017").await.expect("Failed to parse MongoDB parameters");
+    let client_options = ClientOptions::parse(comm::MONGO_ADDRESS).await.expect("Failed to parse MongoDB parameters");
 	let client = Client::with_options(client_options).expect("Failed to connect to MongoDB");
 
 	let db = client.database("thvote_users");
@@ -35,6 +42,7 @@ async fn main() -> std::io::Result<()> {
         vote_year: 2021,
         db: db.clone(),
         voters_coll: db.collection_with_type("voters"),
+        logs_coll: db.collection_with_type("voter_logs"),
         redis_client: redis_client,
         key_pair: load_keys().await.unwrap(),
     };
@@ -46,7 +54,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
     })
-    .bind(("0.0.0.0", 80))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }

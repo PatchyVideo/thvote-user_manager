@@ -2,6 +2,7 @@
 use std::fmt;
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
+use chrono::{Utc};
 use jwt_simple::prelude::{Claims, Duration, ECDSAP256kKeyPairLike, ES256kKeyPair, UnixTimeStamp};
 use serde::{Serialize, Deserialize};
 use bson::{DateTime, oid::ObjectId};
@@ -101,6 +102,7 @@ pub struct VoteTokenClaim {
 /// 投票人
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Voter {
+	#[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
 	pub _id: Option<ObjectId>,
 	pub phone: Option<String>,
 	pub phone_verified: bool,
@@ -112,8 +114,6 @@ pub struct Voter {
 	pub salt: Option<String>,
 	/// 新版投票用户创建日期
 	pub created_at: DateTime,
-	/// 旧版创建日期
-	pub legacy_created_at: Option<DateTime>,
 	pub nickname: Option<String>,
 	pub signup_ip: Option<String>,
 	pub qq_openid: Option<String>,
@@ -174,12 +174,14 @@ pub struct UserEventMeta {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SendPhoneVerifyCodeRequest {
-    pub phone: String
+    pub phone: String,
+    pub meta: UserEventMeta
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SendEmailVerifyCodeRequest {
-    pub email: String
+    pub email: String,
+    pub meta: UserEventMeta
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -210,3 +212,39 @@ pub struct LoginResults {
     /// 投票token，登陆失败了就是错误返回，不会得到这个结构体
     pub vote_token: String
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ActivityLogEntry {
+	SendEmail {
+		created_at: DateTime,
+		target_email: String,
+		code: String,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	SendSMS {
+		created_at: DateTime,
+		target_phone: String,
+		code: String,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	VoterCreation {
+		created_at: DateTime,
+		uid: ObjectId,
+		email: Option<String>,
+		phone: Option<String>,
+		nickname: Option<String>,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	VoterLogin {
+		created_at: DateTime,
+		uid: ObjectId,
+		email: Option<String>,
+		phone: Option<String>,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	}
+}
+

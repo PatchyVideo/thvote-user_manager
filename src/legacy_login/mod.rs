@@ -1,6 +1,6 @@
 use std::{fmt::format, ops::RangeInclusive};
 
-use crate::{context::AppContext, models::{ServiceError, Voter}};
+use crate::{context::AppContext, log, models::{ActivityLogEntry, ServiceError, Voter}};
 use argon2::Config;
 use mongodb::bson::{doc};
 use chrono::Utc;
@@ -37,6 +37,14 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 						}
 					}
 					ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
+					log(ctx, ActivityLogEntry::VoterLogin {
+						created_at: bson::DateTime(Utc::now()),
+						uid: voter._id.as_ref().unwrap().clone(),
+						phone: None,
+						email: None,
+						requester_ip: ip.clone(),
+						requester_additional_fingerprint: additional_fingerprint.clone()
+					}).await;
 					return Ok(voter);
 				}
 			}
@@ -53,6 +61,14 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 						ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
 					}
 				}
+				log(ctx, ActivityLogEntry::VoterLogin {
+					created_at: bson::DateTime(Utc::now()),
+					uid: voter._id.as_ref().unwrap().clone(),
+					phone: None,
+					email: None,
+					requester_ip: ip.clone(),
+					requester_additional_fingerprint: additional_fingerprint.clone()
+				}).await;
 				Ok(voter)
 			} else {
 				Err(Box::new(ServiceError::IncorrectPassword))

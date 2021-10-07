@@ -30,7 +30,6 @@ pub async fn redirect_callback(ctx: &AppContext, uid: String, email: Option<Stri
 			password_hashed: None,
 			salt: None,
 			created_at: bson::DateTime(Utc::now()),
-			legacy_created_at: None,
 			nickname: nickname,
 			signup_ip: signup_ip,
 			qq_openid: None,

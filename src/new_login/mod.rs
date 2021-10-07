@@ -1,7 +1,8 @@
 use std::{fmt::format, ops::RangeInclusive};
 
-use crate::{context::AppContext, models::{ServiceError, Voter}};
+use crate::{context::AppContext, models::{ActivityLogEntry, ServiceError, Voter}};
 use argon2::Config;
+use bson::DateTime;
 use mongodb::bson::{doc};
 use chrono::Utc;
 use chrono::prelude::*;
@@ -9,66 +10,25 @@ use rand::{Rng, RngCore, distributions::uniform::SampleRange, rngs::OsRng};
 use rand::distributions::{Distribution, Uniform};
 use redis::AsyncCommands;
 
+use crate::log;
+
 pub async fn check_email_availability(ctx: &AppContext, email: String) -> Result<bool, Box<dyn std::error::Error>> {
 	Ok(ctx.voters_coll.find_one(doc! { "email": email }, None).await?.is_none())
 }
 
-// pub async fn signup_email_old(ctx: &AppContext, email: String, password: String, ip: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
-// 	if let None = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
-// 		let mut salt = [0u8; 16];
-// 		OsRng.fill_bytes(&mut salt);
-// 		let password_hashed = argon2::hash_encoded(password.as_bytes(), &salt, &Config::default())?;
-// 		let mut voter = Voter {
-// 			_id: None,
-// 			email: Some(email),
-// 			email_verified: false,
-// 			phone: None,
-// 			phone_verified: false,
-// 			password_hashed: Some(password_hashed),
-// 			created_at: bson::DateTime(Utc::now()),
-// 			legacy_created_at: None,
-// 			nickname: nickname,
-// 			signup_ip: ip,
-// 			qq_openid: None,
-// 			thbwiki_uid: None
-// 		};
-// 		if let Some(sid) = sid {
-// 			if let Some(sess) = ctx.get_login_session(&sid).await {
-// 				if let Some(thbwiki_uid) = sess.thbwiki_uid {
-// 					voter.thbwiki_uid = Some(thbwiki_uid);
-// 				}
-// 				if let Some(qq_openid) = sess.qq_openid {
-// 					voter.qq_openid = Some(qq_openid);
-// 				}
-// 			}
-// 		}
-// 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
-// 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
-// 		Ok(voter)
-// 	} else {
-// 		Err(Box::new(ServiceError::UserAlreadyExists))
-// 	}
-// }
-
 pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
 	if let None = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
-		let id = format!("email-verify-{}", email);
-		let expected_code: String = ctx.redis_client.get_async_connection().await?.get(id).await?;
-		if expected_code != verify_code {
-			return Err(ServiceError::IncorrectVerifyCode.into());
-		}
 		let mut voter = Voter {
 			_id: None,
-			email: Some(email),
+			email: Some(email.clone()),
 			email_verified: true,
 			phone: None,
 			phone_verified: false,
 			password_hashed: None,
 			salt: None,
 			created_at: bson::DateTime(Utc::now()),
-			legacy_created_at: None,
-			nickname: nickname,
-			signup_ip: ip,
+			nickname: nickname.clone(),
+			signup_ip: ip.clone(),
 			qq_openid: None,
 			thbwiki_uid: None
 		};
@@ -83,7 +43,17 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			}
 		}
 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
+		println!("{}", iid.inserted_id);
 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
+		log(ctx, ActivityLogEntry::VoterCreation {
+			created_at: DateTime(Utc::now()),
+			uid: voter._id.as_ref().unwrap().clone(),
+			nickname: nickname,
+			phone: None,
+			email: Some(email),
+			requester_ip: ip.clone(),
+			requester_additional_fingerprint: additional_fingerprint.clone()
+		}).await;
 		Ok(voter)
 	} else {
 		Err(Box::new(ServiceError::UserAlreadyExists))
@@ -91,12 +61,18 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 }
 
 pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
+	let id = format!("email-verify-{}", email);
+	let mut conn = ctx.redis_client.get_async_connection().await?;
+	let expected_code: Option<String> = conn.get(&id).await?;
+	if let None = expected_code {
+		return Err(ServiceError::UserNotFound.into());
+	}
+	let expected_code = expected_code.unwrap();
+	if expected_code != verify_code {
+		return Err(ServiceError::IncorrectVerifyCode.into());
+	}
+	conn.del(id).await?;
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
-		let id = format!("email-verify-{}", email);
-		let expected_code: String = ctx.redis_client.get_async_connection().await?.get(id).await?;
-		if expected_code != verify_code {
-			return Err(ServiceError::IncorrectVerifyCode.into());
-		}
 		let mut voter = voter.clone();
 		if let Some(sid) = sid {
 			if let Some(sess) = ctx.get_login_session(&sid).await {
@@ -109,13 +85,21 @@ pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, n
 				ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
 			}
 		};
+		log(ctx, ActivityLogEntry::VoterLogin {
+			created_at: DateTime(Utc::now()),
+			uid: voter._id.as_ref().unwrap().clone(),
+			phone: None,
+			email: Some(email),
+			requester_ip: ip.clone(),
+			requester_additional_fingerprint: additional_fingerprint.clone()
+		}).await;
 		Ok(voter)
 	} else {
 		signup_email(ctx, email, verify_code, nickname, ip, additional_fingerprint, sid).await
 	}
 }
 
-pub async fn send_email(ctx: &AppContext, email: String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, additional_fingerprint: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
 	let id = format!("email-verify-{}", email);
 	let id_guard = format!("email-verify-guard-{}", email);
 	let mut redis_conn = ctx.redis_client.get_async_connection().await?;
@@ -136,6 +120,15 @@ pub async fn send_email(ctx: &AppContext, email: String) -> Result<(), Box<dyn s
 	// invoke SMS send service
 	//todo!();
 	println!(" -- [Email] Code = {}", code);
+
+	// log if succeed
+	log(ctx, ActivityLogEntry::SendEmail {
+		created_at: DateTime(Utc::now()),
+		target_email: email,
+		code: code,
+		requester_ip: ip,
+		requester_additional_fingerprint: additional_fingerprint
+	}).await;
 	Ok(())
 }
 
@@ -145,23 +138,17 @@ pub async fn check_phone_availability(ctx: &AppContext, phone: String) -> Result
 
 pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
 	if let None = ctx.voters_coll.find_one(doc! { "phone": phone.clone() }, None).await? {
-		let id = format!("phone-verify-{}", phone);
-		let expected_code: String = ctx.redis_client.get_async_connection().await?.get(id).await?;
-		if expected_code != verify_code {
-			return Err(ServiceError::IncorrectVerifyCode.into());
-		}
 		let mut voter = Voter {
 			_id: None,
 			email: None,
 			email_verified: false,
-			phone: Some(phone),
+			phone: Some(phone.clone()),
 			phone_verified: true,
 			password_hashed: None,
 			salt: None,
 			created_at: bson::DateTime(Utc::now()),
-			legacy_created_at: None,
-			nickname: nickname,
-			signup_ip: ip,
+			nickname: nickname.clone(),
+			signup_ip: ip.clone(),
 			qq_openid: None,
 			thbwiki_uid: None
 		};
@@ -177,13 +164,22 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 		}
 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
+		log(ctx, ActivityLogEntry::VoterCreation {
+			created_at: DateTime(Utc::now()),
+			uid: voter._id.as_ref().unwrap().clone(),
+			nickname: nickname,
+			phone: Some(phone),
+			email: None,
+			requester_ip: ip.clone(),
+			requester_additional_fingerprint: additional_fingerprint.clone()
+		}).await;
 		Ok(voter)
 	} else {
 		Err(Box::new(ServiceError::UserAlreadyExists))
 	}
 }
 
-pub async fn send_sms(ctx: &AppContext, phone: String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, additional_fingerprint: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
 	let id = format!("phone-verify-{}", phone);
 	let id_guard = format!("phone-verify-guard-{}", phone);
 	let mut redis_conn = ctx.redis_client.get_async_connection().await?;
@@ -214,17 +210,32 @@ pub async fn send_sms(ctx: &AppContext, phone: String) -> Result<(), Box<dyn std
 	// } else {
 	// 	Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
 	// }
+
+	// log if succeed
+	log(ctx, ActivityLogEntry::SendSMS {
+		created_at: DateTime(Utc::now()),
+		target_phone: phone,
+		code: code,
+		requester_ip: ip,
+		requester_additional_fingerprint: additional_fingerprint
+	}).await;
 	Ok(())
 }
 
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
+	let id = format!("phone-verify-{}", phone);
+	let mut conn = ctx.redis_client.get_async_connection().await?;
+	let expected_code: Option<String> = conn.get(&id).await?;
+	if let None = expected_code {
+		return Err(ServiceError::UserNotFound.into());
+	}
+	let expected_code = expected_code.unwrap();
+	if expected_code != verify_code {
+		println!("{}", expected_code);
+		return Err(ServiceError::IncorrectVerifyCode.into());
+	}
+	conn.del(id).await?;
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "phone": phone.clone() }, None).await? {
-		let id = format!("phone-verify-{}", phone);
-		let expected_code: String = ctx.redis_client.get_async_connection().await?.get(id).await?;
-		if expected_code != verify_code {
-			return Err(ServiceError::IncorrectVerifyCode.into());
-		}
-		
 		let mut voter = voter.clone();
 		if let Some(sid) = sid {
 			if let Some(sess) = ctx.get_login_session(&sid).await {
@@ -237,6 +248,14 @@ pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, n
 				ctx.voters_coll.replace_one(doc! { "phone": phone.clone() }, voter.clone(), None).await?;
 			}
 		};
+		log(ctx, ActivityLogEntry::VoterLogin {
+			created_at: DateTime(Utc::now()),
+			uid: voter._id.as_ref().unwrap().clone(),
+			phone: Some(phone),
+			email: None,
+			requester_ip: ip.clone(),
+			requester_additional_fingerprint: additional_fingerprint.clone()
+		}).await;
 		Ok(voter)
 	} else {
 		signup_phone(ctx, phone, verify_code, nickname, ip, additional_fingerprint, sid).await
