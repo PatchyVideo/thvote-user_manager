@@ -23,6 +23,7 @@ pub struct ErrorResponse {
 pub enum ServiceError {
 	Unknown{ detail: String },
 	UserNotFound,
+	AuthorizationFailed,
 	IncorrectPassword,
 	IncorrectVerifyCode,
 	UserAlreadyExists,
@@ -45,6 +46,7 @@ impl ServiceError {
 		match self {
 			ServiceError::Unknown{..} => "Unknown".to_string(),
 			ServiceError::UserNotFound => "UserNotFound".to_string(),
+			ServiceError::AuthorizationFailed => "AuthorizationFailed".to_string(),
 			ServiceError::IncorrectPassword => "IncorrectPassword".to_string(),
 			ServiceError::IncorrectVerifyCode => "IncorrectVerifyCode".to_string(),
 			ServiceError::UserAlreadyExists => "UserAlreadyExists".to_string(),
@@ -61,6 +63,7 @@ impl ResponseError for ServiceError {
 		match self {
 			ServiceError::Unknown{..} => StatusCode::INTERNAL_SERVER_ERROR,
 			ServiceError::UserNotFound => StatusCode::NOT_FOUND,
+			ServiceError::AuthorizationFailed => StatusCode::UNAUTHORIZED,
 			ServiceError::IncorrectPassword => StatusCode::UNAUTHORIZED,
 			ServiceError::IncorrectVerifyCode => StatusCode::UNAUTHORIZED,
 			ServiceError::UserAlreadyExists => StatusCode::UNAUTHORIZED,
@@ -99,6 +102,19 @@ pub struct VoteTokenClaim {
 	pub vote_id: Option<String>
 }
 
+
+#[derive(Clone, Serialize, Deserialize)]
+/// 给前端的投票人
+pub struct VoterFE {
+	pub username: Option<String>,
+	pub pfp: Option<String>,
+	pub password: bool,
+	pub phone: Option<String>,
+	pub email: Option<String>,
+	pub thbwiki: bool,
+	pub patchyvideo: bool
+}
+
 /// 投票人
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Voter {
@@ -117,6 +133,7 @@ pub struct Voter {
 	pub nickname: Option<String>,
 	pub signup_ip: Option<String>,
 	pub qq_openid: Option<String>,
+	pub pfp: Option<String>,
 	pub thbwiki_uid: Option<String>
 }
 
@@ -145,13 +162,24 @@ impl Voter {
 	/// Generate a signed JWT token for user space with
 	/// 1. valid until
 	/// 2. scope (vote or login)
-	pub fn generate_user_auth(&self, key: &ES256kKeyPair) -> Result<String, ServiceError> {
+	pub fn generate_user_auth(&self, key: &ES256kKeyPair) -> String {
 		let addtional_info = VoteTokenClaim {
 			vote_id: Some(self._id.as_ref().unwrap().clone().to_string())
 		};
 		let claims = Claims::with_custom_claims(addtional_info, Duration::from_hours(7 * 24)).
 			with_audience("userspace");
-		Ok(key.sign(claims).unwrap())
+		key.sign(claims).unwrap()
+	}
+	pub fn to_fe_voter(&self, key: &ES256kKeyPair) -> VoterFE {
+		VoterFE {
+			username: self.nickname.clone(),
+			pfp: self.pfp.clone(),
+			password: self.password_hashed.is_some(),
+			phone: self.phone.clone(),
+			email: self.email.clone(),
+			thbwiki: false,
+			patchyvideo: false
+		}
 	}
 }
 
@@ -200,6 +228,30 @@ pub struct EmailLoginInputs {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub struct UpdateEmailInputs {
+	pub user_token: String,
+    pub email: String,
+    pub verify_code: String,
+    pub meta: UserEventMeta
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UpdatePhoneInputs {
+	pub user_token: String,
+    pub phone: String,
+    pub verify_code: String,
+    pub meta: UserEventMeta
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UpdatePasswordInputs {
+	pub user_token: String,
+    pub old_password: String,
+    pub new_password: String,
+    pub meta: UserEventMeta
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PhoneLoginInputs {
     pub phone: String,
     pub nickname: Option<String>,
@@ -209,8 +261,12 @@ pub struct PhoneLoginInputs {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LoginResults {
-    /// 投票token，登陆失败了就是错误返回，不会得到这个结构体
-    pub vote_token: String
+	/// 用户
+	pub user: VoterFE,
+	/// 投票token
+	pub vote_token: String,
+	/// 用户登录token
+	pub session_token: String
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

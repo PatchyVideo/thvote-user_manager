@@ -30,6 +30,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			nickname: nickname.clone(),
 			signup_ip: ip.clone(),
 			qq_openid: None,
+			pfp: None,
 			thbwiki_uid: None
 		};
 		if let Some(sid) = sid {
@@ -65,7 +66,7 @@ pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, n
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::UserNotFound.into());
+		return Err(ServiceError::IncorrectVerifyCode.into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {
@@ -150,6 +151,7 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 			nickname: nickname.clone(),
 			signup_ip: ip.clone(),
 			qq_openid: None,
+			pfp: None,
 			thbwiki_uid: None
 		};
 		if let Some(sid) = sid {
@@ -199,17 +201,32 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 	redis_conn.set_ex(id_guard, "guard", 60).await?;
 	// invoke SMS send service
 	println!(" -- [SMS] Code = {}", code);
-	// let req = crate::sms_service::SMSRequest {
-	// 	code: code,
-	// 	mobile: phone
-	// };
-	// let client = actix_web::client::Client::new();
+	let req = crate::sms_service::SMSRequest {
+		code: code.clone(),
+		mobile: phone.clone()
+	};
+	let client = reqwest::Client::new();
+	let response = client.post(&format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS))
+		.json(&req)
+		.send()
+		.await;
+	let response = match response {
+		Ok(r) => r,
+		Err(e) => { println!("{:?}", e); return Err(ServiceError::Unknown {detail: format!("{:?}", e)}.into()); }
+	};
+	let ret = if response.status().is_success() {
+		Ok(())
+	} else {
+		println!("{:?}", response);
+		Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
+	};
+
 	// let resp = client.post(format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS)).send_json(&req).await?;
-	// if resp.status().is_success() {
+	// let ret = if resp.status().is_success() {
 	// 	Ok(())
 	// } else {
 	// 	Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
-	// }
+	// };
 
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendSMS {
@@ -219,7 +236,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 		requester_ip: ip,
 		requester_additional_fingerprint: additional_fingerprint
 	}).await;
-	Ok(())
+	ret
 }
 
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
@@ -227,7 +244,7 @@ pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, n
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::UserNotFound.into());
+		return Err(ServiceError::IncorrectVerifyCode.into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {

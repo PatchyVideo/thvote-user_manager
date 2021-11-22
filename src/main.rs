@@ -13,6 +13,8 @@ pub mod new_login;
 pub mod thbwiki_login;
 pub mod qq_binding;
 
+pub mod account_management;
+
 use std::{cell::Cell, sync::Arc};
 
 use actix_web::{web, App, HttpRequest, HttpServer, Responder};
@@ -47,14 +49,17 @@ async fn main() -> std::io::Result<()> {
         key_pair: load_keys().await.unwrap(),
     };
     HttpServer::new(move || {
-        App::new().data(ctx.clone())
+        App::new().app_data(ctx.clone())
             .route("/v1/login-email-password", web::post().to(handlers::login_email_password))
             .route("/v1/login-email", web::post().to(handlers::login_email))
             .route("/v1/login-phone", web::post().to(handlers::login_phone))
+            .route("/v1/update-email", web::post().to(handlers::update_email))
+            .route("/v1/update-phone", web::post().to(handlers::update_phone))
+            .route("/v1/update-password", web::post().to(handlers::update_password))
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind("0.0.0.0:80")?
     .run()
     .await
 }

@@ -35,6 +35,7 @@ pub async fn redirect_callback(ctx: &AppContext, uid: String, email: Option<Stri
 			qq_openid: None,
 			thbwiki_uid: Some(uid),
 			phone: None,
+			pfp: None,
 			phone_verified: false,
 		};
 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;

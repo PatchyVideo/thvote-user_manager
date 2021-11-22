@@ -2,7 +2,7 @@ FROM scratch
 
 # These commands copy your files into the specified directory in the image
 # and set that as the working location
-COPY target/x86_64-unknown-linux-musl/release/thvote-user_manager /webapp/app
+COPY target/x86_64-unknown-linux-musl/release/thvote-user-manager /webapp/app
 WORKDIR /webapp
 
 EXPOSE 80
