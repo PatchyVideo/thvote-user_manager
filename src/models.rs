@@ -252,6 +252,11 @@ pub struct UpdatePasswordInputs {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub struct TokenStatusInputs {
+	pub user_token: String
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PhoneLoginInputs {
     pub phone: String,
     pub nickname: Option<String>,

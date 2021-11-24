@@ -12,6 +12,9 @@ use redis::AsyncCommands;
 
 use crate::log;
 
+const SMS_INTERVAL: usize = 120;
+const EMAIL_INTERVAL: usize = 120;
+
 pub async fn check_email_availability(ctx: &AppContext, email: String) -> Result<bool, Box<dyn std::error::Error>> {
 	Ok(ctx.voters_coll.find_one(doc! { "email": email }, None).await?.is_none())
 }
@@ -116,8 +119,8 @@ pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, add
 	let code = format!("{:06}", code_u32);
 	// store in redis, expires in 1 hour
 	redis_conn.set_ex(id, code.clone(), 3600).await?;
-	// store guard in redis, expires in 1 minutes
-	redis_conn.set_ex(id_guard, "guard", 60).await?;
+	// store guard in redis, expires in EMAIL_INTERVAL
+	redis_conn.set_ex(id_guard, "guard", EMAIL_INTERVAL).await?;
 	// invoke SMS send service
 	//todo!();
 	println!(" -- [Email] Code = {}", code);
@@ -197,8 +200,8 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 	let code = format!("{:06}", code_u32);
 	// store in redis, expires in 1 hour
 	redis_conn.set_ex(id, code.clone(), 3600).await?;
-	// store guard in redis, expires in 1 minutes
-	redis_conn.set_ex(id_guard, "guard", 60).await?;
+	// store guard in redis, expires in SMS_INTERVAL
+	redis_conn.set_ex(id_guard, "guard", SMS_INTERVAL).await?;
 	// invoke SMS send service
 	println!(" -- [SMS] Code = {}", code);
 	let req = crate::sms_service::SMSRequest {

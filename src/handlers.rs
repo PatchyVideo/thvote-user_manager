@@ -4,7 +4,7 @@ use bson::oid::ObjectId;
 use actix_web::{error, http::header, http::StatusCode, HttpResponse, ResponseError};
 use jwt_simple::prelude::{Claims, ECDSAP256kPublicKeyLike};
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use crate::{account_management, context::AppContext, legacy_login, models::{ServiceError, VoteTokenClaim}, new_login};
+use crate::{account_management, context::AppContext, legacy_login, models::{EmptyJSON, ServiceError, VoteTokenClaim}, new_login};
 
 use super::models;
 
@@ -152,3 +152,8 @@ pub async fn update_password(ctx: web::Data<AppContext>, request: HttpRequest, b
 	}
 }
 
+
+pub async fn user_token_status(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::TokenStatusInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+	return Ok(web::Json(EmptyJSON::new()))
+}

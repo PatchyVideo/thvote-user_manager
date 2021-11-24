@@ -17,7 +17,7 @@ pub mod account_management;
 
 use std::{cell::Cell, sync::Arc};
 
-use actix_web::{web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpServer, Responder, web::{self, Data}};
 use context::AppContext;
 use jwt::load_keys;
 use models::ActivityLogEntry;
@@ -49,7 +49,7 @@ async fn main() -> std::io::Result<()> {
         key_pair: load_keys().await.unwrap(),
     };
     HttpServer::new(move || {
-        App::new().app_data(ctx.clone())
+        App::new().app_data(Data::new(ctx.clone()))
             .route("/v1/login-email-password", web::post().to(handlers::login_email_password))
             .route("/v1/login-email", web::post().to(handlers::login_email))
             .route("/v1/login-phone", web::post().to(handlers::login_phone))
@@ -58,6 +58,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/update-password", web::post().to(handlers::update_password))
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
+            .route("/v1/user-token-status", web::post().to(handlers::user_token_status))
     })
     .bind("0.0.0.0:80")?
     .run()
