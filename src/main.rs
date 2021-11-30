@@ -59,6 +59,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
             .route("/v1/user-token-status", web::post().to(handlers::user_token_status))
+            .route("/v1/remove-voter", web::post().to(handlers::remove_voter))
     })
     .bind("0.0.0.0:80")?
     .run()

@@ -66,38 +66,54 @@ pub async fn update_phone(ctx: &AppContext, uid: ObjectId, phone: String, verify
     Ok(())
 }
 
-pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: String, new_password: String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Option<String>, new_password: String) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
         if let Some(password_hashed) = voter.password_hashed.as_ref() {
 			if let Some(salt) = voter.salt.as_ref() {
-				let pwrt = format!("{}{}", old_password, salt);
-				if !bcrypt::verify(pwrt, password_hashed).ok().unwrap_or(false) {
-					return Err(ServiceError::IncorrectPassword.into());
+				if let Some(old_password) = old_password {
+					let pwrt = format!("{}{}", old_password, salt);
+					if !bcrypt::verify(pwrt, password_hashed).ok().unwrap_or(false) {
+						return Err(ServiceError::IncorrectPassword.into());
+					} else {
+						// legacy bcrypt verified
+						// upgrade to argon2
+						let mut salt = [0u8; 16];
+						OsRng.fill_bytes(&mut salt);
+						let new_password_hashed = argon2::hash_encoded(new_password.as_bytes(), &salt, &Config::default())?;
+						let mut voter = voter.clone();
+						voter.salt = None;
+						voter.password_hashed = Some(new_password_hashed.clone());
+						ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
+						return Ok(());
+					}
 				} else {
-					// legacy bcrypt verified
-					// upgrade to argon2
+					// missing: old password
+					return Err(Box::new(ServiceError::IncorrectPassword));
+				}
+			}
+			if let Some(old_password) = old_password {
+				if argon2::verify_encoded(password_hashed, old_password.as_bytes())? {
+					let mut voter = voter.clone();
 					let mut salt = [0u8; 16];
 					OsRng.fill_bytes(&mut salt);
 					let new_password_hashed = argon2::hash_encoded(new_password.as_bytes(), &salt, &Config::default())?;
-					let mut voter = voter.clone();
 					voter.salt = None;
 					voter.password_hashed = Some(new_password_hashed.clone());
 					ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
 					return Ok(());
+				} else {
+					return Err(Box::new(ServiceError::IncorrectPassword));
 				}
-			};
-			if argon2::verify_encoded(password_hashed, old_password.as_bytes())? {
+			} else {
 				let mut voter = voter.clone();
 				let mut salt = [0u8; 16];
-                OsRng.fill_bytes(&mut salt);
-                let new_password_hashed = argon2::hash_encoded(new_password.as_bytes(), &salt, &Config::default())?;
-                voter.salt = None;
-                voter.password_hashed = Some(new_password_hashed.clone());
-                ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
-                return Ok(());
-			} else {
-				return Err(Box::new(ServiceError::IncorrectPassword));
-			};
+				OsRng.fill_bytes(&mut salt);
+				let new_password_hashed = argon2::hash_encoded(new_password.as_bytes(), &salt, &Config::default())?;
+				voter.salt = None;
+				voter.password_hashed = Some(new_password_hashed.clone());
+				ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
+				return Ok(());
+			}
 		} else {
 			return Err(Box::new(ServiceError::LoginMethodNotSupported));
 		}
@@ -106,3 +122,15 @@ pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Stri
 }
 
 
+pub async fn remove_voter(ctx: &AppContext, uid: ObjectId) -> Result<(), Box<dyn std::error::Error>> {
+	if let Some(mut voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
+		voter.removed = Some(true);
+		voter.email = None;
+		voter.email_verified = false;
+		voter.phone = None;
+		voter.phone_verified = false;
+		// TODO: log this event
+		ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
+	}
+	Ok(())
+}

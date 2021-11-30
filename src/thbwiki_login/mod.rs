@@ -37,6 +37,7 @@ pub async fn redirect_callback(ctx: &AppContext, uid: String, email: Option<Stri
 			phone: None,
 			pfp: None,
 			phone_verified: false,
+			removed: None
 		};
 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());

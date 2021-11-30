@@ -134,7 +134,9 @@ pub struct Voter {
 	pub signup_ip: Option<String>,
 	pub qq_openid: Option<String>,
 	pub pfp: Option<String>,
-	pub thbwiki_uid: Option<String>
+	pub thbwiki_uid: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub removed: Option<bool>
 }
 
 impl Voter {
@@ -246,7 +248,7 @@ pub struct UpdatePhoneInputs {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct UpdatePasswordInputs {
 	pub user_token: String,
-    pub old_password: String,
+    pub old_password: Option<String>,
     pub new_password: String,
     pub meta: UserEventMeta
 }

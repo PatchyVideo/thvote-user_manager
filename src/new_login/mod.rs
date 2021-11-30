@@ -34,7 +34,8 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			signup_ip: ip.clone(),
 			qq_openid: None,
 			pfp: None,
-			thbwiki_uid: None
+			thbwiki_uid: None,
+			removed: None
 		};
 		if let Some(sid) = sid {
 			if let Some(sess) = ctx.get_login_session(&sid).await {
@@ -155,7 +156,8 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 			signup_ip: ip.clone(),
 			qq_openid: None,
 			pfp: None,
-			thbwiki_uid: None
+			thbwiki_uid: None,
+			removed: None
 		};
 		if let Some(sid) = sid {
 			if let Some(sess) = ctx.get_login_session(&sid).await {
