@@ -157,7 +157,9 @@ impl Voter {
 		let addtional_info = VoteTokenClaim {
 			vote_id: Some(self.generate_vote_id(vote_year)?)
 		};
-		let claims = Claims::with_custom_claims_given_valid_period(addtional_info, UnixTimeStamp::new(1633060800, 0), Duration::from_hours(7 * 24))
+		// let claims = Claims::with_custom_claims_given_valid_period(addtional_info, UnixTimeStamp::new(1633060800, 0), Duration::from_hours(365 * 24))
+		// 	.with_audience("vote");
+		let claims = Claims::with_custom_claims(addtional_info, Duration::from_hours(7 * 24))
 			.with_audience("vote");
 		Ok(key.sign(claims).unwrap())
 	}
@@ -168,8 +170,8 @@ impl Voter {
 		let addtional_info = VoteTokenClaim {
 			vote_id: Some(self._id.as_ref().unwrap().clone().to_string())
 		};
-		let claims = Claims::with_custom_claims(addtional_info, Duration::from_hours(7 * 24)).
-			with_audience("userspace");
+		let claims = Claims::with_custom_claims(addtional_info, Duration::from_hours(7 * 24))
+			.with_audience("userspace");
 		key.sign(claims).unwrap()
 	}
 	pub fn to_fe_voter(&self, key: &ES256kKeyPair) -> VoterFE {
@@ -311,3 +313,9 @@ pub enum ActivityLogEntry {
 	}
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RemoveVoterRequest {
+	pub user_token: String,
+    pub old_password: Option<String>,
+    pub meta: UserEventMeta
+}

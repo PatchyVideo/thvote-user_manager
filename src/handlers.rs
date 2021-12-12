@@ -158,7 +158,7 @@ pub async fn user_token_status(ctx: web::Data<AppContext>, body: actix_web::web:
 	return Ok(web::Json(EmptyJSON::new()))
 }
 
-pub async fn remove_voter(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePasswordInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
+pub async fn remove_voter(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::RemoveVoterRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
 	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::remove_voter(&ctx, uid).await;
