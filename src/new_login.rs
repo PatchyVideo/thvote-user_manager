@@ -1,11 +1,12 @@
 use std::{fmt::format, ops::RangeInclusive};
 
-use crate::{context::AppContext, models::{ActivityLogEntry, ServiceError, Voter}};
+use crate::{context::AppContext, models::{ActivityLogEntry, Voter}, common::SERVICE_NAME};
 use argon2::Config;
 use bson::DateTime;
 use mongodb::bson::{doc};
 use chrono::Utc;
 use chrono::prelude::*;
+use pvrustlib::{ServiceError, EmptyJSON, json_request};
 use rand::{Rng, RngCore, distributions::uniform::SampleRange, rngs::OsRng};
 use rand::distributions::{Distribution, Uniform};
 use redis::AsyncCommands;
@@ -61,7 +62,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 		}).await;
 		Ok(voter)
 	} else {
-		Err(Box::new(ServiceError::UserAlreadyExists))
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "USER_ALREADY_EXIST").into());
 	}
 }
 
@@ -70,11 +71,11 @@ pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, n
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	conn.del(id).await?;
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
@@ -112,7 +113,7 @@ pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, add
 	let guard: Option<String> = redis_conn.get(id_guard.clone()).await?;
 	if let Some(guard) = guard {
 		if guard == "guard" {
-			return Err(ServiceError::TooFrequent.into());
+			return Err(ServiceError::new_error_kind(SERVICE_NAME, "REQUEST_TOO_FREQUENT").into());
 		}
 	}
 	// generate 6 digits code
@@ -122,9 +123,9 @@ pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, add
 	redis_conn.set_ex(id, code.clone(), 3600).await?;
 	// store guard in redis, expires in EMAIL_INTERVAL
 	redis_conn.set_ex(id_guard, "guard", EMAIL_INTERVAL).await?;
-	// invoke SMS send service
-	//todo!();
 	println!(" -- [Email] Code = {}", code);
+	// invoke SMS send service
+	todo!();
 
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendEmail {
@@ -182,7 +183,7 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 		}).await;
 		Ok(voter)
 	} else {
-		Err(Box::new(ServiceError::UserAlreadyExists))
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "USER_ALREADY_EXIST").into());
 	}
 }
 
@@ -194,7 +195,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 	let guard: Option<String> = redis_conn.get(id_guard.clone()).await?;
 	if let Some(guard) = guard {
 		if guard == "guard" {
-			return Err(ServiceError::TooFrequent.into());
+			return Err(ServiceError::new_error_kind(SERVICE_NAME, "REQUEST_TOO_FREQUENT").into());
 		}
 	}
 	// generate 6 digits code
@@ -210,29 +211,8 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 		code: code.clone(),
 		mobile: phone.clone()
 	};
-	let client = reqwest::Client::new();
-	let response = client.post(&format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS))
-		.json(&req)
-		.send()
-		.await;
-	let response = match response {
-		Ok(r) => r,
-		Err(e) => { println!("{:?}", e); return Err(ServiceError::Unknown {detail: format!("{:?}", e)}.into()); }
-	};
-	let ret = if response.status().is_success() {
-		Ok(())
-	} else {
-		println!("{:?}", response);
-		Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
-	};
 
-	// let resp = client.post(format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS)).send_json(&req).await?;
-	// let ret = if resp.status().is_success() {
-	// 	Ok(())
-	// } else {
-	// 	Err(ServiceError::UpstreamRequestFailed { url: format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS) }.into())
-	// };
-
+	let resp: EmptyJSON = json_request(SERVICE_NAME, &format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS), req).await?;
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendSMS {
 		created_at: DateTime(Utc::now()),
@@ -241,7 +221,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 		requester_ip: ip,
 		requester_additional_fingerprint: additional_fingerprint
 	}).await;
-	ret
+	Ok(())
 }
 
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
@@ -249,12 +229,12 @@ pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, n
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {
 		println!("{}", expected_code);
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	conn.del(id).await?;
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "phone": phone.clone() }, None).await? {

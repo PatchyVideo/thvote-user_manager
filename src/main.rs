@@ -3,6 +3,7 @@ pub mod models;
 pub mod context;
 pub mod jwt;
 pub mod comm;
+pub mod common;
 pub mod handlers;
 
 pub mod sms_service;

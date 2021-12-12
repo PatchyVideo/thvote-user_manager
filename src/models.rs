@@ -4,98 +4,11 @@ use std::fmt;
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use chrono::{Utc};
 use jwt_simple::prelude::{Claims, Duration, ECDSAP256kKeyPairLike, ES256kKeyPair, UnixTimeStamp};
+use pvrustlib::ServiceError;
 use serde::{Serialize, Deserialize};
 use bson::{DateTime, oid::ObjectId};
 
-use crate::context::LoginSession;
-
-#[derive(Serialize)]
-pub struct ErrorResponse {
-	code: u16,
-	error: String,
-	message: String,
-	detail: Option<String>,
-	sid: Option<String>,
-	nickname: Option<String>
-}
-
-#[derive(Debug, Clone)]
-pub enum ServiceError {
-	Unknown{ detail: String },
-	UserNotFound,
-	AuthorizationFailed,
-	IncorrectPassword,
-	IncorrectVerifyCode,
-	UserAlreadyExists,
-	UserNotVerified,
-	LoginMethodNotSupported,
-	TooFrequent,
-	RedirectToSignup{ sid: String, nickname: Option<String> },
-	UpstreamRequestFailed { url: String }
-}
-impl std::error::Error for ServiceError {}
-
-impl fmt::Display for ServiceError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl ServiceError {
-	pub fn name(&self) -> String {
-		match self {
-			ServiceError::Unknown{..} => "Unknown".to_string(),
-			ServiceError::UserNotFound => "UserNotFound".to_string(),
-			ServiceError::AuthorizationFailed => "AuthorizationFailed".to_string(),
-			ServiceError::IncorrectPassword => "IncorrectPassword".to_string(),
-			ServiceError::IncorrectVerifyCode => "IncorrectVerifyCode".to_string(),
-			ServiceError::UserAlreadyExists => "UserAlreadyExists".to_string(),
-			ServiceError::UserNotVerified => "UserNotVerified".to_string(),
-			ServiceError::LoginMethodNotSupported => "LoginMethodNotSupported".to_string(),
-			ServiceError::TooFrequent => "TooFrequent".to_string(),
-			ServiceError::RedirectToSignup { sid, nickname } => "RedirectToSignup".to_string(),
-    		ServiceError::UpstreamRequestFailed { url } => "UpstreamRequestFailed".to_string(),
-		}
-	}
-}
-impl ResponseError for ServiceError {
-	fn status_code(&self) -> StatusCode {
-		match self {
-			ServiceError::Unknown{..} => StatusCode::INTERNAL_SERVER_ERROR,
-			ServiceError::UserNotFound => StatusCode::NOT_FOUND,
-			ServiceError::AuthorizationFailed => StatusCode::UNAUTHORIZED,
-			ServiceError::IncorrectPassword => StatusCode::UNAUTHORIZED,
-			ServiceError::IncorrectVerifyCode => StatusCode::UNAUTHORIZED,
-			ServiceError::UserAlreadyExists => StatusCode::UNAUTHORIZED,
-			ServiceError::UserNotVerified => StatusCode::UNAUTHORIZED,
-			ServiceError::LoginMethodNotSupported => StatusCode::NOT_IMPLEMENTED,
-			ServiceError::TooFrequent => StatusCode::TOO_MANY_REQUESTS,
-			ServiceError::RedirectToSignup { sid, nickname } => StatusCode::UNAUTHORIZED,
-    		ServiceError::UpstreamRequestFailed { url } => StatusCode::REQUEST_TIMEOUT,
-		}
-	}
-
-	fn error_response(&self) -> HttpResponse {
-		let status_code = self.status_code();
-		let (sid, nickname) = match self {
-			ServiceError::RedirectToSignup { sid, nickname } => (Some(sid.clone()), nickname.clone()),
-			_ => (None, None)
-		};
-		let detail = match self {
-			ServiceError::Unknown { detail } => Some(detail.clone()),
-			_ => None
-		};
-		let error_response = ErrorResponse {
-			code: status_code.as_u16(),
-			message: self.to_string(),
-			error: self.name(),
-			detail: detail,
-			sid: sid,
-			nickname: nickname
-		};
-		HttpResponse::build(status_code).json(error_response)
-	}
-}
+use crate::{context::LoginSession, common::SERVICE_NAME};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VoteTokenClaim {
@@ -146,7 +59,7 @@ impl Voter {
 			let id = self._id.as_ref().unwrap().clone().to_string();
 			return Ok(format!("thvote-{}-{}", vote_year, id));
 		}
-		return Err(ServiceError::UserNotVerified);
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "USER_UNVERIFIED"));
 	}
 	/// Generate a signed JWT token for voting with
 	/// 1. vote-id
@@ -186,17 +99,6 @@ impl Voter {
 		}
 	}
 }
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct EmptyJSON {
-	
-}
-impl EmptyJSON {
-	pub fn new() -> EmptyJSON {
-		EmptyJSON {  }
-	}
-}
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct UserEventMeta {

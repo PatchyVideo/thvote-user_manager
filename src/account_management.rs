@@ -1,9 +1,10 @@
 use argon2::Config;
 use bson::{doc, oid::ObjectId};
+use pvrustlib::ServiceError;
 use rand::{RngCore, rngs::OsRng};
 use redis::AsyncCommands;
 
-use crate::{context::AppContext, models::ServiceError};
+use crate::{context::AppContext, common::SERVICE_NAME};
 
 
 pub async fn update_email(ctx: &AppContext, uid: ObjectId, email: String, verify_code: String) -> Result<(), Box<dyn std::error::Error>> {
@@ -11,12 +12,12 @@ pub async fn update_email(ctx: &AppContext, uid: ObjectId, email: String, verify
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {
 		println!("{}", expected_code);
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 
     if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
@@ -30,7 +31,7 @@ pub async fn update_email(ctx: &AppContext, uid: ObjectId, email: String, verify
             },
             None).await?;
     } else {
-        return Err(ServiceError::UserNotFound.into());
+        return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
     }
 
     Ok(())
@@ -41,12 +42,12 @@ pub async fn update_phone(ctx: &AppContext, uid: ObjectId, phone: String, verify
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 	let expected_code = expected_code.unwrap();
 	if expected_code != verify_code {
 		println!("{}", expected_code);
-		return Err(ServiceError::IncorrectVerifyCode.into());
+		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
 
     if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
@@ -60,7 +61,7 @@ pub async fn update_phone(ctx: &AppContext, uid: ObjectId, phone: String, verify
             },
             None).await?;
     } else {
-        return Err(ServiceError::UserNotFound.into());
+        return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
     }
 
     Ok(())
@@ -73,7 +74,7 @@ pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Opti
 				if let Some(old_password) = old_password {
 					let pwrt = format!("{}{}", old_password, salt);
 					if !bcrypt::verify(pwrt, password_hashed).ok().unwrap_or(false) {
-						return Err(ServiceError::IncorrectPassword.into());
+						return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_PASSWORD").into());
 					} else {
 						// legacy bcrypt verified
 						// upgrade to argon2
@@ -88,7 +89,7 @@ pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Opti
 					}
 				} else {
 					// missing: old password
-					return Err(Box::new(ServiceError::IncorrectPassword));
+					return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_PASSWORD").into());
 				}
 			}
 			if let Some(old_password) = old_password {
@@ -102,7 +103,7 @@ pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Opti
 					ctx.voters_coll.replace_one(doc! { "_id": uid.clone() }, voter.clone(), None).await?;
 					return Ok(());
 				} else {
-					return Err(Box::new(ServiceError::IncorrectPassword));
+					return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_PASSWORD").into());
 				}
 			} else {
 				let mut voter = voter.clone();
@@ -115,7 +116,7 @@ pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Opti
 				return Ok(());
 			}
 		} else {
-			return Err(Box::new(ServiceError::LoginMethodNotSupported));
+			return Err(ServiceError::new_error_kind(SERVICE_NAME, "LOGIN_METHOD_NOT_SUPPORTED").into());
 		}
     };
     Ok(())

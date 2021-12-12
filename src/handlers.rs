@@ -1,10 +1,9 @@
 
 use actix_web::{App, HttpMessage, HttpRequest, HttpServer, Responder, web};
 use bson::oid::ObjectId;
-use actix_web::{error, http::header, http::StatusCode, HttpResponse, ResponseError};
 use jwt_simple::prelude::{Claims, ECDSAP256kPublicKeyLike};
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use crate::{account_management, context::AppContext, legacy_login, models::{EmptyJSON, ServiceError, VoteTokenClaim}, new_login};
+use pvrustlib::{ServiceError, EmptyJSON};
+use crate::{account_management, context::AppContext, legacy_login, models::{VoteTokenClaim}, new_login, common::SERVICE_NAME};
 
 use super::models;
 
@@ -18,11 +17,7 @@ pub async fn login_email_password(ctx: web::Data<AppContext>, request: HttpReque
 			return Ok(web::Json(models::LoginResults { user: r.to_fe_voter(&ctx.key_pair), vote_token: vote_token, session_token: user_token }));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
@@ -37,11 +32,7 @@ pub async fn login_email(ctx: web::Data<AppContext>, request: HttpRequest, body:
 			return Ok(web::Json(models::LoginResults { user: r.to_fe_voter(&ctx.key_pair), vote_token: vote_token, session_token: user_token }));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
@@ -56,122 +47,94 @@ pub async fn login_phone(ctx: web::Data<AppContext>, request: HttpRequest, body:
 			return Ok(web::Json(models::LoginResults { user: r.to_fe_voter(&ctx.key_pair), vote_token: vote_token, session_token: user_token }));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
-pub async fn send_phone_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendPhoneVerifyCodeRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
+pub async fn send_phone_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendPhoneVerifyCodeRequest>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	println!("Sending phone code to {}", body.phone);
 	let result = new_login::send_sms(&ctx, body.phone.clone(), Some(body.meta.user_ip.clone()), body.meta.additional_fingureprint.clone()).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
-pub async fn send_email_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendEmailVerifyCodeRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
+pub async fn send_email_verify_code(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::SendEmailVerifyCodeRequest>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let result = new_login::send_email(&ctx, body.email.clone(), Some(body.meta.user_ip.clone()), body.meta.additional_fingureprint.clone()).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
-pub async fn update_email(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdateEmailInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+pub async fn update_email(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdateEmailInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_email(&ctx, uid, body.email.clone(), body.verify_code.clone()).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
-pub async fn update_phone(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePhoneInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+pub async fn update_phone(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePhoneInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_phone(&ctx, uid, body.phone.clone(), body.verify_code.clone()).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
-pub async fn update_password(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePasswordInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+pub async fn update_password(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePasswordInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_password(&ctx, uid, body.old_password.clone(), body.new_password.clone()).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }
 
 
-pub async fn user_token_status(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::TokenStatusInputs>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+pub async fn user_token_status(ctx: web::Data<AppContext>, body: actix_web::web::Json<models::TokenStatusInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	return Ok(web::Json(EmptyJSON::new()))
 }
 
-pub async fn remove_voter(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::RemoveVoterRequest>) -> Result<web::Json<models::EmptyJSON>, ServiceError> {
-	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::AuthorizationFailed)?;
+pub async fn remove_voter(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::RemoveVoterRequest>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::remove_voter(&ctx, uid).await;
 	match result {
 		Ok(r) => {
-			return Ok(web::Json(models::EmptyJSON::new()));
+			return Ok(web::Json(EmptyJSON::new()));
 		},
 		Err(e) => {
-			if let Some(service_error) = e.downcast_ref::<ServiceError>() {
-				return Err(service_error.clone());
-			} else {
-				return Err(ServiceError::Unknown { detail: format!("{:?}", e) });
-			}
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
 		},
 	}
 }

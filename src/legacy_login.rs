@@ -1,10 +1,11 @@
 use std::{fmt::format, ops::RangeInclusive};
 
-use crate::{context::AppContext, log, models::{ActivityLogEntry, ServiceError, Voter}};
+use crate::{context::AppContext, log, models::{ActivityLogEntry, Voter}, common::SERVICE_NAME};
 use argon2::Config;
 use mongodb::bson::{doc};
 use chrono::Utc;
 use chrono::prelude::*;
+use pvrustlib::ServiceError;
 use rand::{Rng, RngCore, distributions::uniform::SampleRange, rngs::OsRng};
 use rand::distributions::{Distribution, Uniform};
 use redis::AsyncCommands;
@@ -16,7 +17,7 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 			if let Some(salt) = voter.salt.as_ref() {
 				let pwrt = format!("{}{}", password, salt);
 				if !bcrypt::verify(pwrt, password_hashed).ok().unwrap_or(false) {
-					return Err(Box::new(ServiceError::IncorrectPassword));
+					return Err(Box::new(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_PASSWORD")));
 				} else {
 					// legacy bcrypt verified
 					// upgrade to argon2
@@ -71,12 +72,12 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 				}).await;
 				Ok(voter)
 			} else {
-				Err(Box::new(ServiceError::IncorrectPassword))
+				return Err(Box::new(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_PASSWORD")));
 			}
 		} else {
-			Err(Box::new(ServiceError::LoginMethodNotSupported))
+			return Err(ServiceError::new_error_kind(SERVICE_NAME, "LOGIN_METHOD_NOT_SUPPORTED").into());
 		}
 	} else {
-		Err(Box::new(ServiceError::UserNotFound))
+        return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
 	}
 }
