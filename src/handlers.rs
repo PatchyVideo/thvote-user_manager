@@ -1,4 +1,6 @@
 
+use std::str::FromStr;
+
 use actix_web::{App, HttpMessage, HttpRequest, HttpServer, Responder, web};
 use bson::oid::ObjectId;
 use jwt_simple::prelude::{Claims, ECDSAP256kPublicKeyLike};
@@ -79,7 +81,7 @@ pub async fn send_email_verify_code(ctx: web::Data<AppContext>, body: actix_web:
 
 pub async fn update_email(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdateEmailInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
-	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
+	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_email(&ctx, uid, body.email.clone(), body.verify_code.clone()).await;
 	match result {
 		Ok(r) => {
@@ -93,7 +95,7 @@ pub async fn update_email(ctx: web::Data<AppContext>, request: HttpRequest, body
 
 pub async fn update_phone(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePhoneInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
-	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
+	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_phone(&ctx, uid, body.phone.clone(), body.verify_code.clone()).await;
 	match result {
 		Ok(r) => {
@@ -107,7 +109,7 @@ pub async fn update_phone(ctx: web::Data<AppContext>, request: HttpRequest, body
 
 pub async fn update_password(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePasswordInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
-	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
+	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::update_password(&ctx, uid, body.old_password.clone(), body.new_password.clone()).await;
 	match result {
 		Ok(r) => {
@@ -127,7 +129,7 @@ pub async fn user_token_status(ctx: web::Data<AppContext>, body: actix_web::web:
 
 pub async fn remove_voter(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::RemoveVoterRequest>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
-	let uid: ObjectId = ObjectId::with_string(&claim.custom.vote_id.unwrap()).unwrap();
+	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();
 	let result = account_management::remove_voter(&ctx, uid).await;
 	match result {
 		Ok(r) => {

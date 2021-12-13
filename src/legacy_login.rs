@@ -1,14 +1,10 @@
-use std::{fmt::format, ops::RangeInclusive};
 
 use crate::{context::AppContext, log, models::{ActivityLogEntry, Voter}, common::SERVICE_NAME};
 use argon2::Config;
 use mongodb::bson::{doc};
-use chrono::Utc;
-use chrono::prelude::*;
+use bson::DateTime;
 use pvrustlib::ServiceError;
-use rand::{Rng, RngCore, distributions::uniform::SampleRange, rngs::OsRng};
-use rand::distributions::{Distribution, Uniform};
-use redis::AsyncCommands;
+use rand::{RngCore, rngs::OsRng};
 
 
 pub async fn login_email_password(ctx: &AppContext, email: String, password: String, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
@@ -39,7 +35,7 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 					}
 					ctx.voters_coll.replace_one(doc! { "email": email.clone() }, voter.clone(), None).await?;
 					log(ctx, ActivityLogEntry::VoterLogin {
-						created_at: bson::DateTime(Utc::now()),
+						created_at: DateTime::now(),
 						uid: voter._id.as_ref().unwrap().clone(),
 						phone: None,
 						email: None,
@@ -63,7 +59,7 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 					}
 				}
 				log(ctx, ActivityLogEntry::VoterLogin {
-					created_at: bson::DateTime(Utc::now()),
+					created_at: DateTime::now(),
 					uid: voter._id.as_ref().unwrap().clone(),
 					phone: None,
 					email: None,

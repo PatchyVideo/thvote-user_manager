@@ -44,8 +44,8 @@ async fn main() -> std::io::Result<()> {
     let ctx = context::AppContext {
         vote_year: 2021,
         db: db.clone(),
-        voters_coll: db.collection_with_type("voters"),
-        logs_coll: db.collection_with_type("voter_logs"),
+        voters_coll: db.collection("voters"),
+        logs_coll: db.collection("voter_logs"),
         redis_client: redis_client,
         key_pair: load_keys().await.unwrap(),
     };

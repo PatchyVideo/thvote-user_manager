@@ -30,7 +30,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 			phone_verified: false,
 			password_hashed: None,
 			salt: None,
-			created_at: bson::DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			nickname: nickname.clone(),
 			signup_ip: ip.clone(),
 			qq_openid: None,
@@ -52,7 +52,7 @@ pub async fn signup_email(ctx: &AppContext, email: String, verify_code: String, 
 		println!("{}", iid.inserted_id);
 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
 		log(ctx, ActivityLogEntry::VoterCreation {
-			created_at: DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			uid: voter._id.as_ref().unwrap().clone(),
 			nickname: nickname,
 			phone: None,
@@ -92,7 +92,7 @@ pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, n
 			}
 		};
 		log(ctx, ActivityLogEntry::VoterLogin {
-			created_at: DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			uid: voter._id.as_ref().unwrap().clone(),
 			phone: None,
 			email: Some(email),
@@ -129,7 +129,7 @@ pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, add
 
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendEmail {
-		created_at: DateTime(Utc::now()),
+		created_at: DateTime::now(),
 		target_email: email,
 		code: code,
 		requester_ip: ip,
@@ -152,7 +152,7 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 			phone_verified: true,
 			password_hashed: None,
 			salt: None,
-			created_at: bson::DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			nickname: nickname.clone(),
 			signup_ip: ip.clone(),
 			qq_openid: None,
@@ -173,7 +173,7 @@ pub async fn signup_phone(ctx: &AppContext, phone: String, verify_code: String, 
 		let iid = ctx.voters_coll.insert_one(voter.clone(), None).await?;
 		voter._id = Some(iid.inserted_id.as_object_id().unwrap().clone());
 		log(ctx, ActivityLogEntry::VoterCreation {
-			created_at: DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			uid: voter._id.as_ref().unwrap().clone(),
 			nickname: nickname,
 			phone: Some(phone),
@@ -215,7 +215,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 	let resp: EmptyJSON = json_request(SERVICE_NAME, &format!("{}/v1/vote-code", crate::comm::SERVICE_SMS_ADDRESS), req).await?;
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendSMS {
-		created_at: DateTime(Utc::now()),
+		created_at: DateTime::now(),
 		target_phone: phone,
 		code: code,
 		requester_ip: ip,
@@ -251,7 +251,7 @@ pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, n
 			}
 		};
 		log(ctx, ActivityLogEntry::VoterLogin {
-			created_at: DateTime(Utc::now()),
+			created_at: DateTime::now(),
 			uid: voter._id.as_ref().unwrap().clone(),
 			phone: Some(phone),
 			email: None,
