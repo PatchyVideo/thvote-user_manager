@@ -16,3 +16,9 @@ pub const SERVICE_SMS_ADDRESS: &'static str = "http://127.0.0.1:5010";
 
 #[cfg(not(debug_assertions))]
 pub const SERVICE_SMS_ADDRESS: &'static str = "http://sms-service";
+
+#[cfg(debug_assertions)]
+pub const SERVICE_EMAIL_ADDRESS: &'static str = "http://127.0.0.1:5011";
+
+#[cfg(not(debug_assertions))]
+pub const SERVICE_EMAIL_ADDRESS: &'static str = "http://email-service";

@@ -1,6 +1,6 @@
 use std::{fmt::format, ops::RangeInclusive};
 
-use crate::{context::AppContext, models::{ActivityLogEntry, Voter}, common::SERVICE_NAME};
+use crate::{context::AppContext, models::{ActivityLogEntry, Voter}, common::{SERVICE_NAME, rate_limit}};
 use argon2::Config;
 use bson::DateTime;
 use mongodb::bson::{doc};
@@ -70,6 +70,7 @@ pub async fn login_email(ctx: &AppContext, email: String, verify_code: String, n
 	let id = format!("email-verify-{}", email);
 	let mut conn = ctx.redis_client.get_async_connection().await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
+	rate_limit(&email, &mut conn).await?;
 	if let None = expected_code {
 		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());
 	}
@@ -123,9 +124,14 @@ pub async fn send_email(ctx: &AppContext, email: String, ip: Option<String>, add
 	redis_conn.set_ex(id, code.clone(), 3600).await?;
 	// store guard in redis, expires in EMAIL_INTERVAL
 	redis_conn.set_ex(id_guard, "guard", EMAIL_INTERVAL).await?;
+	// invoke Email send service
 	println!(" -- [Email] Code = {}", code);
-	// invoke SMS send service
-	todo!();
+	let req = crate::email_service::EmailRequest {
+		code: code.clone(),
+		email: email.clone()
+	};
+
+	let resp: EmptyJSON = json_request(SERVICE_NAME, &format!("{}/v1/vote-code", crate::comm::SERVICE_EMAIL_ADDRESS), req).await?;
 
 	// log if succeed
 	log(ctx, ActivityLogEntry::SendEmail {
@@ -227,6 +233,7 @@ pub async fn send_sms(ctx: &AppContext, phone: String, ip: Option<String>, addit
 pub async fn login_phone(ctx: &AppContext, phone: String, verify_code: String, nickname: Option<String>, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
 	let id = format!("phone-verify-{}", phone);
 	let mut conn = ctx.redis_client.get_async_connection().await?;
+	rate_limit(&phone, &mut conn).await?;
 	let expected_code: Option<String> = conn.get(&id).await?;
 	if let None = expected_code {
 		return Err(ServiceError::new_error_kind(SERVICE_NAME, "INCORRECT_VERIFY_CODE").into());

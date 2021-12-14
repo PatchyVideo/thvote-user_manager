@@ -1,5 +1,5 @@
 
-use crate::{context::AppContext, log, models::{ActivityLogEntry, Voter}, common::SERVICE_NAME};
+use crate::{context::AppContext, log, models::{ActivityLogEntry, Voter}, common::{SERVICE_NAME, rate_limit}};
 use argon2::Config;
 use mongodb::bson::{doc};
 use bson::DateTime;
@@ -8,7 +8,9 @@ use rand::{RngCore, rngs::OsRng};
 
 
 pub async fn login_email_password(ctx: &AppContext, email: String, password: String, ip: Option<String>, additional_fingerprint: Option<String>, sid: Option<String>) -> Result<Voter, Box<dyn std::error::Error>> {
+	let mut redis_conn = ctx.redis_client.get_async_connection().await?;
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
+		rate_limit(&voter._id.unwrap(), &mut redis_conn).await?;
 		if let Some(password_hashed) = voter.password_hashed.as_ref() {
 			if let Some(salt) = voter.salt.as_ref() {
 				let pwrt = format!("{}{}", password, salt);
@@ -74,6 +76,9 @@ pub async fn login_email_password(ctx: &AppContext, email: String, password: Str
 			return Err(ServiceError::new_error_kind(SERVICE_NAME, "LOGIN_METHOD_NOT_SUPPORTED").into());
 		}
 	} else {
-        return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
+		if let Some(ip) = ip {
+			rate_limit(&ip, &mut redis_conn).await?;
+		}
+		return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
 	}
 }

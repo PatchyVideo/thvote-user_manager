@@ -212,6 +212,34 @@ pub enum ActivityLogEntry {
 		phone: Option<String>,
 		requester_ip: Option<String>,
 		requester_additional_fingerprint: Option<String>
+	},
+	UpdateEmail {
+		created_at: DateTime,
+		uid: ObjectId,
+		old_email: Option<String>,
+		new_email: String,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	UpdatePhone {
+		created_at: DateTime,
+		uid: ObjectId,
+		old_phone: Option<String>,
+		new_phone: String,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	UpdatePassword {
+		created_at: DateTime,
+		uid: ObjectId,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
+	},
+	RemoveVoter {
+		created_at: DateTime,
+		uid: ObjectId,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>
 	}
 }
 
