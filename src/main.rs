@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
     let redis_client = redis::Client::open(comm::REDIS_ADDRESS).unwrap();
 
     let ctx = context::AppContext {
-        vote_year: 2021,
+        vote_year: 2022,
         db: db.clone(),
         voters_coll: db.collection("voters"),
         logs_coll: db.collection("voter_logs"),
