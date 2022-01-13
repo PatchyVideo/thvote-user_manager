@@ -22,6 +22,11 @@ pub async fn update_email(ctx: &AppContext, uid: ObjectId, email: String, verify
 	}
 
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
+		if let Some(exisiting_voter) = ctx.voters_coll.find_one(doc! { "email": email.clone() }, None).await? {
+			if exisiting_voter._id != voter._id {
+				return Err(ServiceError::new_error_kind(SERVICE_NAME, "EMAIL_IN_USE").into());
+			}
+		}
 		rate_limit(&voter._id.unwrap(), &mut conn).await?;
 		ctx.voters_coll.update_one(
 			doc! { "_id": uid },
@@ -65,6 +70,11 @@ pub async fn update_phone(ctx: &AppContext, uid: ObjectId, phone: String, verify
 	}
 
 	if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
+		if let Some(exisiting_voter) = ctx.voters_coll.find_one(doc! { "phone": phone.clone() }, None).await? {
+			if exisiting_voter._id != voter._id {
+				return Err(ServiceError::new_error_kind(SERVICE_NAME, "PHONE_IN_USE").into());
+			}
+		}
 		rate_limit(&voter._id.unwrap(), &mut conn).await?;
 		ctx.voters_coll.update_one(
 			doc! { "_id": uid },
@@ -92,6 +102,37 @@ pub async fn update_phone(ctx: &AppContext, uid: ObjectId, phone: String, verify
 
 	Ok(())
 }
+
+pub async fn update_nickname(ctx: &AppContext, uid: ObjectId, new_nickname: String, ip: Option<String>, additional_fingerprint: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+	let mut conn = ctx.redis_client.get_async_connection().await?;
+	if let Some(voter) = ctx.voters_coll.find_one(doc! { "_id": uid.clone() }, None).await? {
+		rate_limit(&voter._id.unwrap(), &mut conn).await?;
+		ctx.voters_coll.update_one(
+			doc! { "_id": uid },
+			doc! {
+				"$set": {
+					"nickname": new_nickname.clone()
+				}
+			},
+			None).await?;
+		log(ctx, ActivityLogEntry::UpdateNickname {
+			created_at: DateTime::now(),
+			uid: uid.clone(),
+			old_nickname: voter.nickname.clone(),
+			new_nickname: new_nickname,
+			requester_ip: ip,
+			requester_additional_fingerprint: additional_fingerprint
+		}).await;
+	} else {
+		if let Some(ip) = ip {
+			rate_limit(&ip, &mut conn).await?;
+		}
+		return Err(ServiceError::new_not_found(SERVICE_NAME, None).into());
+	}
+
+	Ok(())
+}
+
 
 pub async fn update_password(ctx: &AppContext, uid: ObjectId, old_password: Option<String>, new_password: String, ip: Option<String>, additional_fingerprint: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
 	let mut redis_conn = ctx.redis_client.get_async_connection().await?;

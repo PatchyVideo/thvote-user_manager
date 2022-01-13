@@ -148,6 +148,12 @@ pub struct UpdatePhoneInputs {
     pub verify_code: String,
     pub meta: UserEventMeta
 }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UpdateNicknameInputs {
+	pub user_token: String,
+    pub nickname: String,
+    pub meta: UserEventMeta
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct UpdatePasswordInputs {
@@ -228,6 +234,14 @@ pub enum ActivityLogEntry {
 		new_phone: String,
 		requester_ip: Option<String>,
 		requester_additional_fingerprint: Option<String>
+	},
+	UpdateNickname {
+		created_at: DateTime,
+		uid: ObjectId,
+		old_nickname: Option<String>,
+		new_nickname: String,
+		requester_ip: Option<String>,
+		requester_additional_fingerprint: Option<String>,
 	},
 	UpdatePassword {
 		created_at: DateTime,

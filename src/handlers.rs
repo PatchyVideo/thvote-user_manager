@@ -107,6 +107,20 @@ pub async fn update_phone(ctx: web::Data<AppContext>, request: HttpRequest, body
 	}
 }
 
+pub async fn update_nickname(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdateNicknameInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
+	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
+	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();
+	let result = account_management::update_nickname(&ctx, uid, body.nickname.clone(), Some(body.meta.user_ip.clone()), body.meta.additional_fingureprint.clone()).await;
+	match result {
+		Ok(r) => {
+			return Ok(web::Json(EmptyJSON::new()));
+		},
+		Err(e) => {
+			return Err(ServiceError::from_dyn_error(SERVICE_NAME, e));
+		},
+	}
+}
+
 pub async fn update_password(ctx: web::Data<AppContext>, request: HttpRequest, body: actix_web::web::Json<models::UpdatePasswordInputs>) -> Result<web::Json<EmptyJSON>, ServiceError> {
 	let claim = ctx.key_pair.public_key().verify_token::<VoteTokenClaim>(&body.user_token, None).map_err(|_| ServiceError::new_jwt_error(SERVICE_NAME, None))?;
 	let uid: ObjectId = ObjectId::from_str(&claim.custom.vote_id.unwrap()).unwrap();

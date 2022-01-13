@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
     let redis_client = redis::Client::open(comm::REDIS_ADDRESS).unwrap();
 
     let ctx = context::AppContext {
-        vote_year: 2022,
+        vote_year: 10,
         db: db.clone(),
         voters_coll: db.collection("voters"),
         logs_coll: db.collection("voter_logs"),
@@ -56,6 +56,7 @@ async fn main() -> std::io::Result<()> {
             .route("/v1/login-phone", web::post().to(handlers::login_phone))
             .route("/v1/update-email", web::post().to(handlers::update_email))
             .route("/v1/update-phone", web::post().to(handlers::update_phone))
+            .route("/v1/update-nickname", web::post().to(handlers::update_nickname))
             .route("/v1/update-password", web::post().to(handlers::update_password))
             .route("/v1/send-sms-code", web::post().to(handlers::send_phone_verify_code))
             .route("/v1/send-email-code", web::post().to(handlers::send_email_verify_code))
